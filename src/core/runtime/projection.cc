@@ -62,7 +62,10 @@ LogicalRegion DelinearizationFunctor::project(LogicalPartition upper_bound,
 
   DomainPoint delinearized;
   delinearized.dim = color_space.dim;
-  int64_t value    = point[0];
+  // TODO: The following line that translates the point to the origin is a temporary hack to allow
+  // client libraries to control mappings of point using the index points as proxies to the target
+  // processors.
+  int64_t value = point[0] - launch_domain.rect_data[0];
   for (int32_t dim = 0; dim < color_space.dim; ++dim) {
     delinearized[dim] = value / strides[dim];
     value             = value % strides[dim];

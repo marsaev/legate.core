@@ -104,6 +104,7 @@ class BuildConfig(SectionConfig):
         pkgs = (
             # 3.25.0 triggers gitlab.kitware.com/cmake/cmake/-/issues/24119
             "cmake>=3.24,!=3.25.0",
+            "cython",
             "git",
             "make",
             "rust",
@@ -111,6 +112,8 @@ class BuildConfig(SectionConfig):
             "scikit-build>=0.13.1",
             "setuptools>=60",
             "zlib",
+            "numba",
+            "valgrind",
         )
         if self.compilers:
             pkgs += ("c-compiler", "cxx-compiler")
@@ -137,6 +140,7 @@ class RuntimeConfig(SectionConfig):
             "cffi",
             "llvm-openmp",
             "numpy>=1.22",
+            "libblas=*=*openblas*",
             "openblas=*=*openmp*",
             "opt_einsum",
             "pyarrow>=5",

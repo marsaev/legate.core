@@ -19,6 +19,7 @@ from __future__ import annotations
 from argparse import REMAINDER, ArgumentDefaultsHelpFormatter, ArgumentParser
 
 from .. import __version__
+from ..util.args import InfoAction
 from ..util.shared_args import (
     CPUS,
     FBMEM,
@@ -264,6 +265,14 @@ debugging.add_argument(
     help="run Legate with cuda-memcheck, "
     "[legate-only, not supported with standard Python invocation]",
 )
+debugging.add_argument(
+    "--valgrind",
+    dest="valgrind",
+    action="store_true",
+    required=False,
+    help="run Legate with valgrind, "
+    "[legate-only, not supported with standard Python invocation]",
+)
 
 
 debugging.add_argument(
@@ -387,4 +396,11 @@ other.add_argument(
     "--version",
     action="version",
     version=__version__,
+)
+
+other.add_argument(
+    "--info",
+    action=InfoAction,
+    help="Print information about the capabilities of this build of legate, "
+    "and immediately exit.",
 )

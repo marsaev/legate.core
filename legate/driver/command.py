@@ -14,6 +14,7 @@
 #
 from __future__ import annotations
 
+import argparse
 from typing import TYPE_CHECKING
 
 from .. import install_info
@@ -36,6 +37,12 @@ def cmd_bind(
     config: ConfigProtocol, system: System, launcher: Launcher
 ) -> CommandPart:
     ranks = config.multi_node.ranks
+
+    if ranks > 1 and len(install_info.networks) == 0:
+        raise RuntimeError(
+            "multi-rank run was requested, but Legate was not built with "
+            "networking support"
+        )
 
     if launcher.kind == "none":
         bind_launcher_arg = "local" if ranks == 1 else "auto"
@@ -125,12 +132,31 @@ def cmd_nsys(
     targets = config.profiling.nsys_targets
     extra = config.profiling.nsys_extra
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-s", "--sample")
+    parser.add_argument("-t", "--targets")
+    nsys_parsed_args, unparsed = parser.parse_known_args(extra)
+
+    if nsys_parsed_args.targets:
+        raise RuntimeError(
+            "please pass targets as arguments to --nsys"
+            "rather than using --nsys-extra"
+        )
+
     opts: CommandPart = ("nsys", "profile", "-t", targets, "-o", log_path)
     opts += tuple(extra)
-    if "-s" not in extra:
+    if not nsys_parsed_args.sample:
         opts += ("-s", "none")
 
     return opts
+
+
+def cmd_valgrind(
+    config: ConfigProtocol, system: System, launcher: Launcher
+) -> CommandPart:
+    valgrind = config.debugging.valgrind
+
+    return () if not valgrind else ("valgrind",)
 
 
 def cmd_memcheck(
@@ -190,13 +216,6 @@ def cmd_python_processor(
     return ("-ll:py", "1")
 
 
-def cmd_local_field(
-    config: ConfigProtocol, system: System, launcher: Launcher
-) -> CommandPart:
-    # We always need no local fields
-    return ("-lg:local", "0")
-
-
 def cmd_kthreads(
     config: ConfigProtocol, system: System, launcher: Launcher
 ) -> CommandPart:
@@ -225,6 +244,12 @@ def cmd_gpus(
 ) -> CommandPart:
     gpus = config.core.gpus
 
+    if gpus > 0 and not install_info.use_cuda:
+        raise RuntimeError(
+            "--gpus was requested, but this build does not have CUDA "
+            "support enabled"
+        )
+
     # Make sure that we skip busy GPUs
     return () if gpus == 0 else ("-ll:gpu", str(gpus), "-cuda:skipbusy")
 
@@ -235,6 +260,12 @@ def cmd_openmp(
     openmp = config.core.openmp
     ompthreads = config.core.ompthreads
     numamem = config.memory.numamem
+
+    if openmp > 0 and not install_info.use_openmp:
+        raise RuntimeError(
+            "--omps was requested, but this build does not have OpenMP "
+            "support enabled"
+        )
 
     if openmp == 0:
         return ()
@@ -397,10 +428,15 @@ def cmd_user_opts(
     return config.user_opts
 
 
+def cmd_python(
+    config: ConfigProtocol, system: System, launcher: Launcher
+) -> CommandPart:
+    return ("python",)
+
+
 _CMD_PARTS_SHARED = (
     # This has to go before script name
     cmd_nocr,
-    cmd_local_field,
     cmd_kthreads,
     # Translate the requests to Realm command line parameters
     cmd_cpus,
@@ -429,6 +465,8 @@ CMD_PARTS_LEGION = (
         cmd_nsys,
         # Add memcheck right before the binary
         cmd_memcheck,
+        # Add valgrind right before the binary
+        cmd_valgrind,
         # Now we're ready to build the actual command to run
         cmd_legion,
         # This has to go before script name
@@ -446,6 +484,8 @@ CMD_PARTS_LEGION = (
 
 CMD_PARTS_CANONICAL = (
     (
+        # Executable name that will get stripped by the runtime
+        cmd_python,
         # User script
         cmd_user_script,
     )

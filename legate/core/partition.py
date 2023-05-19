@@ -360,7 +360,7 @@ class Tiling(PartitionBase):
                 keep=True,  # export this partition functor to other libraries
             )
             runtime.partition_manager.record_index_partition(
-                index_space, self, index_partition, color_shape=color_shape
+                self, index_partition, color_shape=color_shape
             )
         return region.get_child(index_partition)
 
@@ -466,9 +466,13 @@ class Weighted(PartitionBase):
                 keep=True,  # export this partition functor to other libraries
             )
             runtime.partition_manager.record_index_partition(
-                index_space, self, index_partition
+                self, index_partition
             )
         return region.get_child(index_partition)
+
+    def import_partition(self, partition: LegionPartition) -> None:
+        index_partition = partition.index_partition
+        runtime.partition_manager.record_index_partition(self, index_partition)
 
 
 class ImagePartition(PartitionBase):
@@ -550,7 +554,7 @@ class ImagePartition(PartitionBase):
                 keep=True,
             )
             runtime.partition_manager.record_index_partition(
-                region.index_space, self, index_partition
+                self, index_partition
             )
         return region.get_child(index_partition)
 
@@ -700,7 +704,7 @@ class PreimagePartition(PartitionBase):
                 keep=True,
             )
             runtime.partition_manager.record_index_partition(
-                region.index_space, self, index_partition
+                self, index_partition
             )
         return region.get_child(index_partition)
 
@@ -809,7 +813,7 @@ class DomainPartition(PartitionBase):
                 keep=True,
             )
             runtime.partition_manager.record_index_partition(
-                index_space, self, index_partition
+                self, index_partition
             )
         return region.get_child(index_partition)
 

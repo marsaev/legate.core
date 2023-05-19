@@ -19,6 +19,7 @@
 #include "core/data/buffer.h"
 #include "core/data/transform.h"
 #include "core/task/return.h"
+#include "core/type/type_info.h"
 #include "core/utilities/machine.h"
 #include "core/utilities/typedefs.h"
 #include "legate_defines.h"
@@ -166,30 +167,30 @@ class RegionField {
   bool reducible_{false};
 };
 
-class OutputRegionField {
+class UnboundRegionField {
  public:
-  OutputRegionField() {}
-  OutputRegionField(const Legion::OutputRegion& out, Legion::FieldID fid);
+  UnboundRegionField() {}
+  UnboundRegionField(const Legion::OutputRegion& out, Legion::FieldID fid);
 
  public:
-  OutputRegionField(OutputRegionField&& other) noexcept;
-  OutputRegionField& operator=(OutputRegionField&& other) noexcept;
+  UnboundRegionField(UnboundRegionField&& other) noexcept;
+  UnboundRegionField& operator=(UnboundRegionField&& other) noexcept;
 
  private:
-  OutputRegionField(const OutputRegionField& other)            = delete;
-  OutputRegionField& operator=(const OutputRegionField& other) = delete;
+  UnboundRegionField(const UnboundRegionField& other)            = delete;
+  UnboundRegionField& operator=(const UnboundRegionField& other) = delete;
 
  public:
   bool bound() const { return bound_; }
 
  public:
   template <typename T, int32_t DIM>
-  Buffer<T, DIM> create_output_buffer(const Point<DIM>& extents, bool return_buffer);
+  Buffer<T, DIM> create_output_buffer(const Point<DIM>& extents, bool bind_buffer);
 
  public:
   template <typename T, int32_t DIM>
-  void return_data(Buffer<T, DIM>& buffer, const Point<DIM>& extents);
-  void make_empty(int32_t dim);
+  void bind_data(Buffer<T, DIM>& buffer, const Point<DIM>& extents);
+  void bind_empty_data(int32_t dim);
 
  public:
   ReturnValue pack_weight() const;
@@ -208,7 +209,7 @@ class FutureWrapper {
  public:
   FutureWrapper() {}
   FutureWrapper(bool read_only,
-                int32_t field_size,
+                uint32_t field_size,
                 Domain domain,
                 Legion::Future future,
                 bool initialize = false);
@@ -257,7 +258,7 @@ class FutureWrapper {
 
  private:
   bool read_only_{true};
-  size_t field_size_{0};
+  uint32_t field_size_{0};
   Domain domain_{};
   Legion::Future future_{};
   Legion::UntypedDeferredValue buffer_{};
@@ -271,18 +272,18 @@ class Store {
  public:
   Store() {}
   Store(int32_t dim,
-        int32_t code,
+        std::unique_ptr<Type> type,
         int32_t redop_id,
         FutureWrapper future,
         std::shared_ptr<TransformStack>&& transform = nullptr);
   Store(int32_t dim,
-        int32_t code,
+        std::unique_ptr<Type> type,
         int32_t redop_id,
         RegionField&& region_field,
         std::shared_ptr<TransformStack>&& transform = nullptr);
   Store(int32_t dim,
-        int32_t code,
-        OutputRegionField&& output,
+        std::unique_ptr<Type> type,
+        UnboundRegionField&& unbound_field,
         std::shared_ptr<TransformStack>&& transform = nullptr);
 
  public:
@@ -318,14 +319,20 @@ class Store {
    */
   int32_t dim() const { return dim_; }
   /**
+   * @brief Returns the type metadata of the store
+   *
+   * @return The store's type metadata
+   */
+  const Type& type() const { return *type_; }
+  /**
    * @brief Returns the type code of the store
    *
    * @return The store's type code
    */
-  template <typename TYPE_CODE = LegateTypeCode>
+  template <typename TYPE_CODE = Type::Code>
   TYPE_CODE code() const
   {
-    return static_cast<TYPE_CODE>(code_);
+    return static_cast<TYPE_CODE>(type_->code);
   }
 
  public:
@@ -420,17 +427,17 @@ class Store {
   /**
    * @brief Creates a buffer of specified extents for the unbound store. The returned
    * buffer is always consistent with the mapping policy for the store. Can be invoked
-   * multiple times unless `return_buffer` is true.
+   * multiple times unless `bind_buffer` is true.
    *
    * @param extents Extents of the buffer
    *
-   * @param return_buffer If the value is true, the created buffer will be bound
+   * @param bind_buffer If the value is true, the created buffer will be bound
    * to the store upon return
    *
    * @return A reduction accessor to the store
    */
   template <typename T, int32_t DIM>
-  Buffer<T, DIM> create_output_buffer(const Point<DIM>& extents, bool return_buffer = false);
+  Buffer<T, DIM> create_output_buffer(const Point<DIM>& extents, bool bind_buffer = false);
 
  public:
   /**
@@ -499,12 +506,12 @@ class Store {
    *
    */
   template <typename T, int32_t DIM>
-  void return_data(Buffer<T, DIM>& buffer, const Point<DIM>& extents);
+  void bind_data(Buffer<T, DIM>& buffer, const Point<DIM>& extents);
   /**
    * @brief Makes the unbound store empty. Valid only when the store is unbound and
    * has not yet been bound to another buffer.
    */
-  void make_empty();
+  void bind_empty_data();
 
  public:
   /**
@@ -523,9 +530,9 @@ class Store {
    * @return true The store is an unbound store
    * @return false The store is a normal store
    */
-  bool is_output_store() const { return is_output_store_; }
+  bool is_unbound_store() const { return is_unbound_store_; }
   ReturnValue pack() const { return future_.pack(); }
-  ReturnValue pack_weight() const { return output_field_.pack_weight(); }
+  ReturnValue pack_weight() const { return unbound_field_.pack_weight(); }
 
  public:
   // TODO: It'd be btter to return a parent store from this method than permanently
@@ -540,15 +547,15 @@ class Store {
 
  private:
   bool is_future_{false};
-  bool is_output_store_{false};
+  bool is_unbound_store_{false};
   int32_t dim_{-1};
-  int32_t code_{-1};
+  std::unique_ptr<Type> type_{nullptr};
   int32_t redop_id_{-1};
 
  private:
   FutureWrapper future_;
   RegionField region_field_;
-  OutputRegionField output_field_;
+  UnboundRegionField unbound_field_;
 
  private:
   std::shared_ptr<TransformStack> transform_{nullptr};

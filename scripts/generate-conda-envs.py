@@ -75,7 +75,10 @@ class CUDAConfig(SectionConfig):
             deps += (
                 "cuda-cudart-dev",
                 "cuda-nvml-dev",
-                "cuda-nvtx-dev",
+                "cuda-nvtx",
+                "libcusparse-dev",
+                # needed by cusparse starting with 12.1
+                "libnvjitlink",
             )
 
         if self.compilers:
@@ -282,7 +285,7 @@ CTK_VERSIONS = (
     "11.8",
     "12.0",
     # TODO: libcublas 12.1 not available on conda-forge as of 2023-06-12
-    # "12.1",
+    "12.1",
 )
 
 OS_NAMES: Tuple[OSType, ...] = ("linux", "osx")
@@ -291,8 +294,8 @@ OS_NAMES: Tuple[OSType, ...] = ("linux", "osx")
 ENV_TEMPLATE = """\
 name: legate-{use}
 channels:
-  - conda-forge
   - nvidia
+  - conda-forge
 dependencies:
 
   - python={python},!=3.9.7  # avoid https://bugs.python.org/issue45121

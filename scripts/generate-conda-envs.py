@@ -67,6 +67,8 @@ class CUDAConfig(SectionConfig):
         deps = (
             f"cuda-version={self.ctk_version}",  # runtime
             "cutensor>=1.3.3,<2",  # runtime
+            "libcutensor-dev-cuda-12<2",
+            "libcutensor-cuda-12<2",
             "nccl",  # runtime
             "pynvml",  # tests
         )
